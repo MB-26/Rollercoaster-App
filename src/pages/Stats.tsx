@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { DataFile } from "../services/dataShape";
 import type { Coaster, Manufacturer, Park, Rank } from "../types";
 import { loadData } from "../services/dataManager";
