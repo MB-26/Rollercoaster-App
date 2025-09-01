@@ -1,50 +1,52 @@
-// Minimal GitHub JSON store for personal use (no backend).
-// Reads/writes a single JSON file in a private repo via GitHub API.
+// src/services/githubStore.ts
 
+// Client config no longer includes a token.
 export type GitHubStoreConfig = {
-    owner: string;           // your GitHub username
-    repo: string;            // "coasterbook-data"
-    branch: string;          // e.g. "main"
-    path: string;            // "data.json"
-    token: string;           // fine-grained PAT
-  };
-  
-  export async function loadJson<T>(cfg: GitHubStoreConfig): Promise<{ data: T; sha: string }> {
-    const res = await fetch(
-      `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}?ref=${cfg.branch}`,
-      { headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json" } }
-    );
-    if (!res.ok) throw new Error(`GitHub load failed: ${res.status} ${await res.text()}`);
-    const json = await res.json() as any;
-    const decoded = JSON.parse(atob(json.content.replace(/\n/g, ""))) as T;
-    return { data: decoded, sha: json.sha };
-  }
-  
-  export async function saveJson<T>(
-    cfg: GitHubStoreConfig,
-    content: T,
-    prevSha: string,
-    message = "Update data.json"
-  ) {
-    const body = {
-      message,
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+  owner: string;
+  repo: string;
+  branch: string; // e.g. "main"
+  path: string;   // e.g. "data.json"
+};
+
+// Utility: decode base64 GitHub file content returned by /api/github/read
+function base64ToString(b64: string) {
+  // GitHub may include newlines in "content"
+  const clean = b64.replace(/\n/g, "");
+  // atob is available in the browser; for SSR you'd use Buffer
+  return decodeURIComponent(escape(window.atob(clean)));
+}
+
+export async function loadJson<T>(cfg: GitHubStoreConfig): Promise<{ data: T; sha: string }> {
+  const url = `/api/github/read?owner=${encodeURIComponent(cfg.owner)}&repo=${encodeURIComponent(cfg.repo)}&path=${encodeURIComponent(cfg.path)}&ref=${encodeURIComponent(cfg.branch)}`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GitHub load failed: ${res.status} ${await res.text()}`);
+
+  const json = await res.json() as any; // shape matches GitHub contents API
+  const decoded = JSON.parse(base64ToString(json.content)) as T;
+  return { data: decoded, sha: json.sha };
+}
+
+export async function saveJson<T>(
+  cfg: GitHubStoreConfig,
+  content: T,
+  prevSha: string,
+  message = "Update data.json"
+) {
+  const res = await fetch("/api/github/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      owner: cfg.owner,
+      repo: cfg.repo,
+      path: cfg.path,
       branch: cfg.branch,
-      sha: prevSha
-    };
-    const res = await fetch(
-      `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${cfg.token}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      }
-    );
-    if (!res.ok) throw new Error(`GitHub save failed: ${res.status} ${await res.text()}`);
-    return (await res.json()) as any; // returns new content with new sha
-  }
-  
+      message,
+      content, // Server will JSON.stringify & base64-encode
+      sha: prevSha,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`GitHub save failed: ${res.status} ${await res.text()}`);
+  return (await res.json()) as any; // includes new sha, commit info, etc.
+}
