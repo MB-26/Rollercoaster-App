@@ -1,15 +1,17 @@
-// /api/github/save.ts
-export default async function handler(req, res) {
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { owner, repo, path, message = "Update data", content, sha, branch = "main" } = req.body;
+  const { owner, repo, path, message = "Update data", content, sha, branch = "main" } =
+    (req.body ?? {}) as {
+      owner: string; repo: string; path: string;
+      message?: string; content: unknown; sha?: string; branch?: string;
+    };
 
-  const payload = {
-    message,
-    content: Buffer.from(typeof content === "string" ? content : JSON.stringify(content)).toString("base64"),
-    sha: sha ?? undefined,
-    branch,
-  };
+  const base64 = Buffer.from(
+    typeof content === "string" ? content : JSON.stringify(content)
+  ).toString("base64");
 
   const r = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
         Accept: "application/vnd.github+json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ message, content: base64, sha, branch }),
     }
   );
 

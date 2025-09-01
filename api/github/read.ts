@@ -1,6 +1,9 @@
-// /api/github/read.ts  (Node runtime on Vercel)
-export default async function handler(req, res) {
-  const { owner, repo, path, ref = "main" } = req.query;
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const { owner, repo, path, ref = "main" } = req.query as {
+    owner: string; repo: string; path: string; ref?: string;
+  };
 
   const r = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${ref}`,
