@@ -12,6 +12,13 @@ type LoadState =
 export default function DataEntry() {
   const [state, setState] = useState<LoadState>({ status: "idle" });
 
+  // edit state
+  const [editing, setEditing] = useState<{
+    parkId?: string;
+    manId?: string;
+    coasterId?: string;
+  }>({});
+
   // form state
   const [parkName, setParkName] = useState("");
   const [manName, setManName] = useState("");
@@ -60,7 +67,7 @@ export default function DataEntry() {
     mutator(next);
     try {
       const res = await saveData(next, state.sha, message);
-      const newSha: string = res.content.sha ?? res.commit.sha; // GitHub returns a new sha
+      const newSha: string = res.content?.sha ?? res.commit?.sha;
       setState({ status: "ready", data: next, sha: newSha });
     } catch (e: any) {
       alert(
@@ -70,42 +77,119 @@ export default function DataEntry() {
     }
   }
 
-  async function addPark(e: React.FormEvent) {
-    e.preventDefault();
-    const name = parkName.trim();
-    if (!name) return;
-    await commit(
-      (d) => {
-        // dedupe by case-insensitive name
-        if (!d.parks.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
-          d.parks.push({ id: uuid(), name });
-        }
-      },
-      `Add park: ${name}`
-    );
+  // ------- Parks -------
+  function startEditPark(p: Park) {
+    setEditing({ parkId: p.id });
+    setParkName(p.name);
+  }
+  function cancelEditPark() {
+    setEditing((e) => ({ ...e, parkId: undefined }));
     setParkName("");
   }
 
-  async function addMan(e: React.FormEvent) {
+  async function submitPark(e: React.FormEvent) {
     e.preventDefault();
-    const name = manName.trim();
+    const name = parkName.trim();
     if (!name) return;
-    await commit(
-      (d) => {
-        if (
-          !d.manufacturers.some(
-            (m) => m.name.toLowerCase() === name.toLowerCase()
-          )
-        ) {
-          d.manufacturers.push({ id: uuid(), name });
-        }
-      },
-      `Add manufacturer: ${name}`
+
+    const editingId = editing.parkId;
+
+    // check collision (ignore the one we’re editing)
+    const nameTaken = parks.some(
+      (p) =>
+        p.name.toLowerCase() === name.toLowerCase() &&
+        (!editingId || p.id !== editingId)
     );
+    if (nameTaken) {
+      alert("A park with that name already exists.");
+      return;
+    }
+
+    if (!editingId) {
+      // Add
+      await commit(
+        (d) => {
+          d.parks.push({ id: uuid(), name });
+        },
+        `Add park: ${name}`
+      );
+    } else {
+      // Update
+      await commit(
+        (d) => {
+          const idx = d.parks.findIndex((p) => p.id === editingId);
+          if (idx >= 0) d.parks[idx] = { ...d.parks[idx], name };
+        },
+        `Update park: ${name}`
+      );
+    }
+    setParkName("");
+    setEditing((e2) => ({ ...e2, parkId: undefined }));
+  }
+
+  // ------- Manufacturers -------
+  function startEditMan(m: Manufacturer) {
+    setEditing({ manId: m.id });
+    setManName(m.name);
+  }
+  function cancelEditMan() {
+    setEditing((e) => ({ ...e, manId: undefined }));
     setManName("");
   }
 
-  async function addCoaster(e: React.FormEvent) {
+  async function submitMan(e: React.FormEvent) {
+    e.preventDefault();
+    const name = manName.trim();
+    if (!name) return;
+
+    const editingId = editing.manId;
+
+    const nameTaken = mans.some(
+      (m) =>
+        m.name.toLowerCase() === name.toLowerCase() &&
+        (!editingId || m.id !== editingId)
+    );
+    if (nameTaken) {
+      alert("A manufacturer with that name already exists.");
+      return;
+    }
+
+    if (!editingId) {
+      await commit(
+        (d) => {
+          d.manufacturers.push({ id: uuid(), name });
+        },
+        `Add manufacturer: ${name}`
+      );
+    } else {
+      await commit(
+        (d) => {
+          const idx = d.manufacturers.findIndex((m) => m.id === editingId);
+          if (idx >= 0) d.manufacturers[idx] = { ...d.manufacturers[idx], name };
+        },
+        `Update manufacturer: ${name}`
+      );
+    }
+    setManName("");
+    setEditing((e2) => ({ ...e2, manId: undefined }));
+  }
+
+  // ------- Coasters -------
+  function startEditCoaster(c: Coaster) {
+    setEditing({ coasterId: c.id });
+    setCoasterForm({
+      name: c.name ?? "",
+      parkId: c.parkId ?? "",
+      manufacturerId: c.manufacturerId ?? "",
+      notes: c.notes ?? "",
+    });
+  }
+  function cancelEditCoaster() {
+    setEditing((e) => ({ ...e, coasterId: undefined }));
+    setCoasterForm({ name: "", parkId: "", manufacturerId: "", notes: "" });
+  }
+
+  async function submitCoaster(e: React.FormEvent) {
     e.preventDefault();
     const name = coasterForm.name.trim();
     const parkId = coasterForm.parkId;
@@ -117,14 +201,23 @@ export default function DataEntry() {
       return;
     }
 
-    await commit(
-      (d) => {
-        // prevent duplicate coaster (by name at same park)
-        const exists = d.coasters.some(
-          (c) =>
-            c.name.toLowerCase() === name.toLowerCase() && c.parkId === parkId
-        );
-        if (!exists) {
+    const editingId = editing.coasterId;
+
+    // prevent duplicate coaster (same name at same park), excluding the one being edited
+    const exists = coasters.some(
+      (c) =>
+        c.name.toLowerCase() === name.toLowerCase() &&
+        c.parkId === parkId &&
+        (!editingId || c.id !== editingId)
+    );
+    if (exists) {
+      alert("A coaster with that name already exists at the selected park.");
+      return;
+    }
+
+    if (!editingId) {
+      await commit(
+        (d) => {
           d.coasters.push({
             id: uuid(),
             name,
@@ -132,12 +225,29 @@ export default function DataEntry() {
             manufacturerId,
             notes,
           });
-        }
-      },
-      `Add coaster: ${name}`
-    );
+        },
+        `Add coaster: ${name}`
+      );
+    } else {
+      await commit(
+        (d) => {
+          const idx = d.coasters.findIndex((c) => c.id === editingId);
+          if (idx >= 0) {
+            d.coasters[idx] = {
+              ...d.coasters[idx],
+              name,
+              parkId,
+              manufacturerId,
+              notes,
+            };
+          }
+        },
+        `Update coaster: ${name}`
+      );
+    }
 
     setCoasterForm({ name: "", parkId: "", manufacturerId: "", notes: "" });
+    setEditing((e2) => ({ ...e2, coasterId: undefined }));
   }
 
   if (state.status === "loading" || state.status === "idle") {
@@ -167,52 +277,120 @@ export default function DataEntry() {
     <div className="p-6 space-y-8 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold">Data Entry</h1>
 
-      {/* Add Park */}
+      {/* Parks */}
       <section>
-        <h2 className="text-xl font-semibold mb-2">Add Park</h2>
-        <form onSubmit={addPark} className="flex gap-2">
+        <h2 className="text-xl font-semibold mb-2">Park</h2>
+        <form onSubmit={submitPark} className="flex gap-2">
           <input
             className="border p-2 rounded flex-1"
             placeholder="Park name"
             value={parkName}
             onChange={(e) => setParkName(e.target.value)}
           />
-          <button className="bg-black text-white px-4 py-2 rounded">Add</button>
+          {editing.parkId ? (
+            <>
+              <button className="bg-black text-white px-4 py-2 rounded">
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={cancelEditPark}
+                className="px-4 py-2 rounded border"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="bg-black text-white px-4 py-2 rounded">
+              Add
+            </button>
+          )}
         </form>
+
         {parks.length > 0 && (
-          <ul className="mt-2 list-disc ml-6">
+          <ul className="mt-2 ml-0">
             {parks.map((p) => (
-              <li key={p.id}>{p.name}</li>
+              <li
+                key={p.id}
+                className="flex items-center justify-between border-b py-1"
+              >
+                <span>
+                  {p.name}
+                  {editing.parkId === p.id && (
+                    <span className="ml-2 text-xs text-blue-600">(editing)</span>
+                  )}
+                </span>
+                <button
+                  className="text-sm px-2 py-1 border rounded"
+                  onClick={() => startEditPark(p)}
+                >
+                  Edit
+                </button>
+              </li>
             ))}
           </ul>
         )}
       </section>
 
-      {/* Add Manufacturer */}
+      {/* Manufacturers */}
       <section>
-        <h2 className="text-xl font-semibold mb-2">Add Manufacturer</h2>
-        <form onSubmit={addMan} className="flex gap-2">
+        <h2 className="text-xl font-semibold mb-2">Manufacturer</h2>
+        <form onSubmit={submitMan} className="flex gap-2">
           <input
             className="border p-2 rounded flex-1"
             placeholder="Manufacturer name"
             value={manName}
             onChange={(e) => setManName(e.target.value)}
           />
-          <button className="bg-black text-white px-4 py-2 rounded">Add</button>
+          {editing.manId ? (
+            <>
+              <button className="bg-black text-white px-4 py-2 rounded">
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={cancelEditMan}
+                className="px-4 py-2 rounded border"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="bg-black text-white px-4 py-2 rounded">
+              Add
+            </button>
+          )}
         </form>
+
         {mans.length > 0 && (
-          <ul className="mt-2 list-disc ml-6">
+          <ul className="mt-2 ml-0">
             {mans.map((m) => (
-              <li key={m.id}>{m.name}</li>
+              <li
+                key={m.id}
+                className="flex items-center justify-between border-b py-1"
+              >
+                <span>
+                  {m.name}
+                  {editing.manId === m.id && (
+                    <span className="ml-2 text-xs text-blue-600">(editing)</span>
+                  )}
+                </span>
+                <button
+                  className="text-sm px-2 py-1 border rounded"
+                  onClick={() => startEditMan(m)}
+                >
+                  Edit
+                </button>
+              </li>
             ))}
           </ul>
         )}
       </section>
 
-      {/* Add Coaster */}
+      {/* Coasters */}
       <section>
-        <h2 className="text-xl font-semibold mb-2">Add Coaster</h2>
-        <form onSubmit={addCoaster} className="grid gap-2">
+        <h2 className="text-xl font-semibold mb-2">Coaster</h2>
+        <form onSubmit={submitCoaster} className="grid gap-2">
           <input
             className="border p-2 rounded"
             placeholder="Coaster name"
@@ -243,7 +421,10 @@ export default function DataEntry() {
             className="border p-2 rounded"
             value={coasterForm.manufacturerId}
             onChange={(e) =>
-              setCoasterForm((f) => ({ ...f, manufacturerId: e.target.value }))
+              setCoasterForm((f) => ({
+                ...f,
+                manufacturerId: e.target.value,
+              }))
             }
           >
             <option value="">Manufacturer (optional)</option>
@@ -263,24 +444,60 @@ export default function DataEntry() {
             }
           />
 
-          <button className="bg-black text-white px-4 py-2 rounded">
-            Add Coaster
-          </button>
+          <div className="flex gap-2">
+            {editing.coasterId ? (
+              <>
+                <button className="bg-black text-white px-4 py-2 rounded">
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEditCoaster}
+                  className="px-4 py-2 rounded border"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button className="bg-black text-white px-4 py-2 rounded">
+                Add Coaster
+              </button>
+            )}
+          </div>
         </form>
 
         {coasters.length > 0 && (
-          <ul className="mt-2 list-disc ml-6">
-            {coasters.map((c) => (
-              <li key={c.id}>
-                {c.name} —{" "}
-                {parks.find((p) => p.id === c.parkId)?.name ?? "Unknown park"}{" "}
-                (
-                {c.manufacturerId
-                  ? mans.find((m) => m.id === c.manufacturerId)?.name ?? "Unknown manufacturer"
-                  : "No manufacturer"}
-                )
-              </li>
-            ))}
+          <ul className="mt-2 ml-0">
+            {coasters.map((c) => {
+              const parkName =
+                parks.find((p) => p.id === c.parkId)?.name ?? "Unknown park";
+              const manName =
+                c.manufacturerId
+                  ? mans.find((m) => m.id === c.manufacturerId)?.name ??
+                    "Unknown manufacturer"
+                  : "No manufacturer";
+              return (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between border-b py-1"
+                >
+                  <span>
+                    {c.name} — {parkName} ({manName})
+                    {editing.coasterId === c.id && (
+                      <span className="ml-2 text-xs text-blue-600">
+                        (editing)
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    className="text-sm px-2 py-1 border rounded"
+                    onClick={() => startEditCoaster(c)}
+                  >
+                    Edit
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
