@@ -70,7 +70,7 @@ export default function Stats() {
       // Rank may be { coasterId, position } or just ordered list.
       const coasterId = (r as any).coasterId ?? (r as any).id ?? (r as any);
       const position = (r as any).position ?? i + 1;
-      const pts = positionToPoints(position);
+      const pts = positionToPoints(position, ranks.length);
       if (coasterId) pointsByCoaster[coasterId] = pts;
     });
 
