@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Link, NavLink } from "react-router-dom";
 //import Home from "./pages/Home";
 import DataEntry from "./pages/DataEntry";
-//import Coasters from "./pages/Coasters";     // if you haven't created these yet, you can comment these two lines
+import Coasters from "./pages/Coasters";     // if you haven't created these yet, you can comment these two lines
 import Rankings from "./pages/Rankings";     // or add placeholder pages
-import Settings from "./pages/Settings";
+//import Settings from "./pages/Settings";
 import Stats from "./pages/Stats";
 //import DebugConfig from "./pages/DebugConfig";
 
