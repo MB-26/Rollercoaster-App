@@ -10,8 +10,6 @@ type LoadState =
   | { status: "ready"; data: DataFile }
   | { status: "error"; message: string };
 
-const LIST_ID = "main";
-
 type Mode = "parks" | "manufacturers";
 
 type CoasterWithPoints = Coaster & {
@@ -50,27 +48,27 @@ export default function Coasters() {
 
     const { parks, manufacturers, coasters, ranks } = state.data;
 
-    // Quick lookup maps
     const parkMap = new Map(parks.map((p) => [p.id, p]));
     const manMap = new Map(manufacturers.map((m) => [m.id, m]));
+
+    // Figure out how many coasters are actually ranked
+    const rankedCount = ranks.length;
+
     const rankMap = new Map<string, Rank>();
     for (const r of ranks) {
-      // Assuming each coaster has at most one rank in the main list.
-      // If multiple, keep the best (highest points).
+      const newPts = positionToPoints(r.position, rankedCount);
       const current = rankMap.get(r.coasterId);
-      const newPts = positionToPoints(LIST_ID, r.position);
       if (!current) {
         rankMap.set(r.coasterId, r);
       } else {
-        const curPts = positionToPoints(LIST_ID, current.position);
+        const curPts = positionToPoints(current.position, rankedCount);
         if (newPts > curPts) rankMap.set(r.coasterId, r);
       }
     }
 
-    // Attach points to each coaster
     const withPoints: CoasterWithPoints[] = coasters.map((c) => {
       const rank = rankMap.get(c.id);
-      const pts = rank ? positionToPoints(LIST_ID, rank.position) : 0;
+      const pts = rank ? positionToPoints(rank.position, rankedCount) : 0;
       return {
         ...c,
         points: pts,
@@ -79,13 +77,11 @@ export default function Coasters() {
       };
     });
 
-    // Sort coasters within each group by points desc, name asc
     const byPointsThenName = (a: CoasterWithPoints, b: CoasterWithPoints) => {
       if (b.points !== a.points) return b.points - a.points;
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     };
 
-    // Build groups
     const groupMap = new Map<string, GroupRow>();
 
     const getKeyAndName = (c: CoasterWithPoints) => {
@@ -111,12 +107,10 @@ export default function Coasters() {
       g.count += 1;
     }
 
-    // Sort items inside each group
     for (const g of groupMap.values()) {
       g.items.sort(byPointsThenName);
     }
 
-    // Turn into array and sort groups by total points desc, then name
     const groups: GroupRow[] = Array.from(groupMap.values()).sort((a, b) => {
       if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
@@ -138,7 +132,6 @@ export default function Coasters() {
     );
   }
 
-  // UI helpers
   const ModeToggle = () => (
     <div className="toggle">
       <button
@@ -206,7 +199,6 @@ export default function Coasters() {
         </div>
       )}
 
-      {/* Local styles (scoped to this component if using CSS Modules, otherwise move to your stylesheet) */}
       <style>{`
         .container { max-width: 900px; margin: 0 auto; padding: 24px; }
         .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
