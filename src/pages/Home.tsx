@@ -1,7 +1,7 @@
 // src/pages/Home.tsx
 import { useEffect, useMemo, useState } from "react";
 import type { DataFile } from "../services/dataShape";
-import type { Coaster, Manufacturer, Park, Rank } from "../types";
+import type { Rank } from "../types";
 import { loadData } from "../services/dataManager";
 import { positionToPoints } from "../logic/points";
 
@@ -40,10 +40,28 @@ export default function Home() {
     if (state.status !== "ready") return null;
     const data = state.data;
 
-    // Basic lookups
-    const coastersById = Object.fromEntries(data.coasters.map((c) => [c.id, c]));
-    const parksById = Object.fromEntries(data.parks.map((p) => [p.id, p]));
-    const mfrsById = Object.fromEntries(data.manufacturers.map((m) => [m.id, m]));
+    // Build typed lookup maps
+    const coastersById: Record<string, DataFile["coasters"][number]> = data.coasters.reduce(
+      (acc, c) => {
+        acc[c.id] = c;
+        return acc;
+      },
+      {} as Record<string, DataFile["coasters"][number]>
+    );
+    const parksById: Record<string, DataFile["parks"][number]> = data.parks.reduce(
+      (acc, p) => {
+        acc[p.id] = p;
+        return acc;
+      },
+      {} as Record<string, DataFile["parks"][number]>
+    );
+    const mfrsById: Record<string, DataFile["manufacturers"][number]> = data.manufacturers.reduce(
+      (acc, m) => {
+        acc[m.id] = m;
+        return acc;
+      },
+      {} as Record<string, DataFile["manufacturers"][number]>
+    );
 
     // Filter to the main list and ensure numeric positions
     const ranksInList: Rank[] = (data.ranks ?? []).filter((r) => r.listId === LIST_ID);
@@ -63,16 +81,16 @@ export default function Home() {
       .map(([coasterId, points]) => {
         const c = coastersById[coasterId];
         if (!c) return null;
-        const park = parksById[c.parkId];
-        const mfr = mfrsById[c.manufacturerId];
+        const parkName = c.parkId ? parksById[c.parkId]?.name : undefined;
+        const mfrName = c.manufacturerId ? mfrsById[c.manufacturerId]?.name : undefined;
         return {
           id: coasterId,
           name: c.name,
           points,
-          extra: [park?.name, mfr?.name].filter(Boolean).join(" · "),
-        } as PodiumItem;
+          extra: [parkName, mfrName].filter(Boolean).join(" · "),
+        } as PodiumItem | null;
       })
-      .filter(Boolean as any)
+      .filter((x): x is PodiumItem => x !== null)
       .sort((a, b) => b.points - a.points)
       .slice(0, 3);
 
@@ -127,7 +145,7 @@ export default function Home() {
       .sort((a, b) => b.points - a.points)
       .slice(0, 3);
 
-    return { coasterItems, parkItems, mfrItems, totalRanked };
+    return { coasterItems, parkItems, mfrItems, totalRanked, data };
   }, [state]);
 
   if (state.status === "loading" || state.status === "idle") {
@@ -138,7 +156,7 @@ export default function Home() {
   }
   if (!content) return null;
 
-  const { coasterItems, parkItems, mfrItems, totalRanked } = content;
+  const { coasterItems, parkItems, mfrItems, totalRanked, data } = content;
 
   return (
     <div className="page home">
@@ -154,7 +172,7 @@ export default function Home() {
         <PodiumBlock title="Top 3 Manufacturers" items={mfrItems} />
       </section>
 
-      <QuickStats dataState={state} />
+      <QuickStats data={data} listId={LIST_ID} />
       <MainNav />
       <style>{styles}</style>
     </div>
@@ -195,13 +213,12 @@ function PodiumBlock({ title, subtitle, items }: { title: string; subtitle?: str
   );
 }
 
-function QuickStats({ dataState }: { dataState: Extract<LoadState, { status: "ready" }> }) {
-  const d = dataState.data;
+function QuickStats({ data, listId }: { data: DataFile; listId: string }) {
   const totals = {
-    coasters: d.coasters.length,
-    parks: d.parks.length,
-    manufacturers: d.manufacturers.length,
-    ranked: (d.ranks ?? []).filter((r) => r.listId === LIST_ID).length,
+    coasters: data.coasters.length,
+    parks: data.parks.length,
+    manufacturers: data.manufacturers.length,
+    ranked: (data.ranks ?? []).filter((r) => r.listId === listId).length,
   };
   return (
     <section className="quickstats">
