@@ -268,7 +268,7 @@ export default function Rankings() {
         Drag rows by the position number, or use ↑/↓ to nudge. Changes auto-save to GitHub.
       </p>
       <p className="text-xs text-gray-500">
-        Points use a compressed power schedule: bottom = 1; top grows with list size (≈25 for 10).
+        Points use a hinged system: bottom = 1, linear rise until the half way point, then exponential towards the top.
       </p>
     </div>
   );
