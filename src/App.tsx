@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, NavLink } from "react-router-dom";
-//import Home from "./pages/Home";
+import Home from "./pages/Home";
 import DataEntry from "./pages/DataEntry";
 import Coasters from "./pages/Coasters";     // if you haven't created these yet, you can comment these two lines
 import Rankings from "./pages/Rankings";     // or add placeholder pages
@@ -29,7 +29,7 @@ export default function App() {
 
         <main className="max-w-5xl mx-auto px-4 py-6">
           <Routes>
-            {/* <Route path="/" element={<Home />} /> */}
+            <Route path="/" element={<Home />} />
             <Route path="/data" element={<DataEntry />} />
             <Route path="/rankings" element={<Rankings />} />
             <Route path="/coasters" element={<Coasters />} />
