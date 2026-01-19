@@ -3,10 +3,10 @@
 export type TieredPointsConfig = {
   linearPct: number;     // bottom %
   accelPct: number;      // middle %
-  godMultiplier: number; // top tier growth (e.g. 1.5)
+  godMultiplier: number; // top tier growth
 };
 
-// Default: 50% linear, 40% accelerating, 10% god tier
+// 50% linear, 40% accelerating, 10% god tier
 export const defaultTiered: TieredPointsConfig = {
   linearPct: 0.5,
   accelPct: 0.4,
@@ -14,9 +14,10 @@ export const defaultTiered: TieredPointsConfig = {
 };
 
 /**
- * Position 1 = WORST
- * Position N = BEST
- * Always returns whole numbers
+ * Position 1 = BEST
+ * Position N = WORST
+ * Returns whole-number points
+ * NO other code changes required
  */
 export function positionToPoints(
   position: number,
@@ -25,19 +26,16 @@ export function positionToPoints(
 ): number {
   if (position < 1 || position > total || total < 1) return 0;
 
+  // 🔑 Fix: invert position internally
+  const effectivePosition = total - position + 1;
+
   const linearEnd = Math.floor(total * cfg.linearPct);
   const accelEnd = linearEnd + Math.floor(total * cfg.accelPct);
-
-  const scores: number[] = new Array(total);
 
   let score = 1;
   let increment = 1;
 
-  scores[0] = score; // worst coaster
-
-  for (let i = 1; i < total; i++) {
-    const p = i + 1;
-
+  for (let p = 2; p <= effectivePosition; p++) {
     if (p <= linearEnd) {
       increment = 1;
     } else if (p <= accelEnd) {
@@ -45,10 +43,8 @@ export function positionToPoints(
     } else {
       increment = Math.round(increment * cfg.godMultiplier);
     }
-
     score += increment;
-    scores[i] = score;
   }
 
-  return scores[position - 1];
+  return score;
 }
