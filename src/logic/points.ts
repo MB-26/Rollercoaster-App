@@ -1,31 +1,53 @@
 // src/logic/points.ts
 
-export type AcceleratingPoints = {
-  pivotFraction: number; // e.g. 0.5 = halfway
+export type TieredPointsConfig = {
+  linearPct: number;      // e.g. 0.5  -> bottom 50%
+  accelPct: number;       // e.g. 0.4  -> next 40%
+  godMultiplier: number;  // e.g. 1.5  -> top tier growth
 };
 
-export const defaultAccelerating: AcceleratingPoints = {
-  pivotFraction: 0.5,
+// Default configuration (50% / 40% / 10%)
+export const defaultTiered: TieredPointsConfig = {
+  linearPct: 0.5,
+  accelPct: 0.4,
+  godMultiplier: 1.5,
 };
 
+/**
+ * Converts a 1-based position into points.
+ * Position 1 = worst, position N = best.
+ *
+ * @param position 1-based rank position
+ * @param total Total number of ranked items
+ * @param cfg Tiered scoring configuration
+ */
 export function positionToPoints(
   position: number,
   total: number,
-  cfg: AcceleratingPoints = defaultAccelerating
+  cfg: TieredPointsConfig = defaultTiered
 ): number {
-  if (total <= 0) return 0;
+  if (position < 1 || total < 1) return 0;
 
-  // Convert rank to ascending index (1 = worst, N = best)
-  const i = total - position + 1;
+  const linearEnd = Math.floor(total * cfg.linearPct);
+  const accelEnd = linearEnd + Math.floor(total * cfg.accelPct);
 
-  const pivot = Math.max(1, Math.floor(total * cfg.pivotFraction));
+  let score = 1;
+  let increment = 1;
 
-  if (i <= pivot) {
-    // Linear section
-    return i;
+  for (let p = 2; p <= position; p++) {
+    if (p <= linearEnd) {
+      // Phase 1: linear
+      increment = 1;
+    } else if (p <= accelEnd) {
+      // Phase 2: accelerating (+1 each step)
+      increment += 1;
+    } else {
+      // Phase 3: god tier (×1.5, rounded)
+      increment = Math.round(increment * cfg.godMultiplier);
+    }
+
+    score += increment;
   }
 
-  // Accelerating section (triangular growth)
-  const k = i - pivot;
-  return pivot + (k * (k + 1)) / 2;
+  return score;
 }
