@@ -3,7 +3,7 @@ import Home from "./pages/Home";
 import DataEntry from "./pages/DataEntry";
 import Coasters from "./pages/Coasters";     // if you haven't created these yet, you can comment these two lines
 import Rankings from "./pages/Rankings";     // or add placeholder pages
-//import Settings from "./pages/Settings";
+import Settings from "./pages/Settings";
 import Stats from "./pages/Stats";
 //import DebugConfig from "./pages/DebugConfig";
 
@@ -22,8 +22,8 @@ export default function App() {
             <NavLink to="/rankings" className={linkClass}>Rankings</NavLink>
             <NavLink to="/coasters" className={linkClass}>Coasters</NavLink>
             <NavLink to="/stats" className={linkClass}>Stats</NavLink>
-            {/* <NavLink to="/settings" className={linkClass}>Settings</NavLink>
-            <NavLink to="/debugconfig" className={linkClass}>Debug Config</NavLink> */}
+            <NavLink to="/settings" className={linkClass}>Settings</NavLink>
+            {/* <NavLink to="/debugconfig" className={linkClass}>Debug Config</NavLink> */}
           </nav>
         </header>
 
@@ -33,7 +33,7 @@ export default function App() {
             <Route path="/data" element={<DataEntry />} />
             <Route path="/rankings" element={<Rankings />} />
             <Route path="/coasters" element={<Coasters />} />
-            {/* <Route path="/settings" element={<Settings />} /> */}
+             <Route path="/settings" element={<Settings />} />
             <Route path="/stats" element={<Stats />} />
             {/* <Route path="/debugconfig" element={<DebugConfig />} /> */}
           </Routes>
